@@ -113,6 +113,20 @@ reason, and nothing is charged. On mainnet the record comes from the free check 
 sandbox it comes from the fork's own pool, for the agent the buyer names in an `X-Priors-Agent` header. `@priors/mcp`'s
 `pay_url` sends no such header yet, so in the sandbox use `refuseDefaulted` alone for buyers that pay with it.
 
+To see the policy work in the sandbox, ask for one repaid loan. Put `{ "service": { "payerPolicy": { "minRepaid": 1 } } }`
+in the seller's `.agent001/config.json`, then run `agent001 serve`. Then, as a buyer with its own folder:
+
+```bash
+export AGENT001_HOME=/tmp/buyer AGENT001_RPC=http://127.0.0.1:8545
+agent001 init && agent001 fund && agent001 join
+node examples/pay-with-record.mjs "http://127.0.0.1:4021/quote?symbol=AAPL"   # refused: no repaid loan yet, nothing paid
+agent001 borrow 5 --days 8 && agent001 repay --all                             # one loan repaid
+node examples/pay-with-record.mjs "http://127.0.0.1:4021/quote?symbol=AAPL"   # served, the payment settles on the fork
+```
+
+[`examples/pay-with-record.mjs`](examples/pay-with-record.mjs) pays with `@priors/x402` and names the buyer's agent in
+`X-Priors-Agent`, so the seller can read its record from the chain.
+
 ## Run it for good: Docker, Railway, Fly
 
 An agent builds its record by being there when its loans come due, so on mainnet run it somewhere that stays up.

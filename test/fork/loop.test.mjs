@@ -119,6 +119,10 @@ test("x402: another agent pays agent001's quote service, the payment settles on 
     assert.equal(await usdg.balanceOf(buyer), 990_000n);
     const buyerKey = JSON.parse(readFileSync(join(buyerDir, ".agent001", "wallet.json"), "utf8")).privateKey.slice(2).toLowerCase();
     assert.equal((r.out + serveOut).toLowerCase().includes(buyerKey), false);
+    // a second agent folder on the same sandbox joins too (its own fork-only inviter: the sandbox's is in the seller's folder)
+    const bj = await run(["join"], buyerEnv);
+    assert.equal(bj.code, 0, bj.out);
+    assert.match(bj.out, /joined Priors: a \$5\.00 line backed by the treasury \(#6228\)/);
   } finally {
     serve.kill("SIGINT");
     transcript.push(serveOut);

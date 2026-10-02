@@ -91,12 +91,22 @@ export async function fund(provider, address, usdg = 20) {
   await dealErc20(provider, ADDR.usdg, address, ethers.parseUnits(String(usdg), 6));
 }
 
-/** An invite for `agentId` signed by the sandbox's inviter (EIP-712 digest from the treasury itself). */
+/**
+ * An invite for `agentId` signed by a fork-only inviter (EIP-712 digest from the treasury itself). The sandbox's own
+ * inviter lives in the folder that started it; another agent folder on the same fork names its own the same way
+ * (impersonating the treasury's owner, which only a fork allows) and keeps it in its sandbox.json.
+ */
 export async function sandboxInvite(provider, home, agentId) {
-  const sb = readJson(pathOf(home, "sandbox.json"));
-  if (!sb?.inviterKey || !(await isSandbox(provider))) throw new Error("no sandbox is running (start one with `agent001 sandbox`)");
-  const inviter = new ethers.Wallet(sb.inviterKey);
+  if (!(await isSandbox(provider))) throw new Error("no sandbox is running (start one with `agent001 sandbox`)");
+  const path = pathOf(home, "sandbox.json");
+  const sb = readJson(path) || {};
   const t4 = new ethers.Contract(ADDR.treasuryV4, TREASURY_ABI, provider);
+  let inviter = sb.inviterKey ? new ethers.Wallet(sb.inviterKey) : null;
+  if (!inviter || !(await t4.inviters(inviter.address))) {
+    inviter = ethers.Wallet.createRandom();
+    await asImpersonated(provider, await t4.owner(), async (owner) => { await (await t4.connect(owner).setInviter(inviter.address, true)).wait(); });
+    writeJson(path, { ...sb, inviterKey: inviter.privateKey });
+  }
   const expiry = (await provider.getBlock("latest")).timestamp + 7 * 86400;
   const digest = await t4.inviteDigest(agentId, expiry);
   return `priors-invite:${agentId}:${expiry}:${inviter.signingKey.sign(digest).serialized}`;
