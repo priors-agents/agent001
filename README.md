@@ -21,7 +21,8 @@ lines of plain JavaScript.
 ## Try it in the sandbox (5 minutes, play money)
 
 The sandbox is a local fork of Robinhood Chain with the real Priors contracts: agent001 goes through the whole loop with
-play money, and nothing reaches mainnet. You need [Node.js](https://nodejs.org) 20.18 or later, git, and `anvil` from
+play money: anvil reads the chain's state from Robinhood Chain's public RPC as it goes (so it needs internet), and
+every transaction stays on the fork. You need [Node.js](https://nodejs.org) 20.18 or later, git, and `anvil` from
 [Foundry](https://getfoundry.sh) (`curl -L https://foundry.paradigm.xyz | bash`, then `foundryup`).
 
 ```bash
@@ -30,8 +31,9 @@ npm install
 alias agent001="node $PWD/bin/agent001.mjs"
 ```
 
-Never run `npx agent001`: an unrelated package on npm has that name. The alias runs this clone's own CLI. Run the
-commands from the clone's folder: agent001 keeps its files in `./.agent001`.
+Never run `npx agent001`: an unrelated package on npm has that name. The alias runs this clone's own CLI (in a script,
+where aliases are off, call `node bin/agent001.mjs` instead). Run the commands from the clone's folder: agent001 keeps
+its files in `./.agent001`.
 
 ```bash
 agent001 init                  # the agent's wallet; the key stays in .agent001/wallet.json, never printed
@@ -55,8 +57,10 @@ agent001 status                # 1 loan repaid (1 qualified), and an on-chain sc
 agent001 chat "what is my record?"
 ```
 
-Commands print `[sandbox fork]` while the sandbox runs. If you stop the sandbox, they refuse to run until you start it
-again or delete `.agent001/sandbox.json`; they never fall back to mainnet on their own.
+Commands mark their results `[sandbox fork]` while the sandbox runs. The sandbox's agent exists only on the fork, so
+its id is kept in `.agent001/sandbox.json`, not in `config.json`. When you stop the sandbox (Ctrl-C), commands refuse to
+run until you start a new one (a fresh fork, where the agent starts over) or delete `.agent001/sandbox.json`: they never
+fall back to mainnet on their own, and mainnet then starts with no agent.
 
 **Selling a quote**, still in the sandbox: run `agent001 serve` in another terminal (the sandbox settles payments with a
 local facilitator), then pay it from a second agent with its own folder:
@@ -89,7 +93,8 @@ agent001 run                   # the autopilot (and Telegram, if configured) unt
   is exactly that text for its own agent. It sends no transaction.
 - **Repay on time.** Three days past due, anyone can mark a loan defaulted: the record is burnt forever, the owner's
   address is marked, and the treasury that backed the agent pays. `agent001 run` (or `autopilot`) repays every loan
-  `repayHoursBeforeDue` (24 h) before it is due, if the wallet holds the USDG. It warns early when it does not.
+  as soon as it is within `repayHoursBeforeDue` (24 h) of its due date, at its next check (every 30 min), if the wallet
+  holds the USDG. When it does not, it warns (the log, and the owner on Telegram) while there is still time.
 - **The public record**: `https://priors.trade/api/check?agent=<id>`, and a badge for a page or README:
   `https://priors.trade/api/badge/<id>.svg`.
 
@@ -124,7 +129,8 @@ and the model is not even offered the money tools.
 
 ## Configuration
 
-`.agent001/config.json` (created by `join`; edit it to change anything). Defaults:
+`.agent001/config.json` holds only what you change from these defaults, nested as in the table; for example
+`{ "caps": { "maxBorrowUsd": 10, "maxOpenBorrowUsd": 10 }, "autopilot": { "borrow": true } }`. Defaults:
 
 | key | default | |
 |---|---|---|
@@ -132,7 +138,7 @@ and the model is not even offered the money tools.
 | `caps.maxOpenBorrowUsd` | 5 | most principal open at once, all loans together |
 | `caps.maxPriceUsd` | 0.10 | most one x402 payment may cost |
 | `caps.maxSpendPerDayUsd` | 1 | most x402 payments may total in a UTC day |
-| `autopilot.repayHoursBeforeDue` | 24 | repay each loan at least this long before it is due |
+| `autopilot.repayHoursBeforeDue` | 24 | repay each loan once it is within this many hours of its due date |
 | `autopilot.borrow` | false | true: keep one loan open to build the record (only when the wallet already holds the fee) |
 | `autopilot.borrowUsd`, `borrowDays` | 5, 8 | that loan: 8 days repaid a day early is held 7, a "seasoned" loan for the score |
 | `autopilot.everyMinutes` | 30 | how often `run` and `autopilot` check |

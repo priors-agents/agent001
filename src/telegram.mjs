@@ -15,6 +15,17 @@ const HELP = [
   "or just ask a question.",
 ].join("\n");
 
+/** Messages to the owner's chat only (the autopilot's alerts under `agent001 run`), redacted like every other line. */
+export function makeOwnerNotifier({ token, ownerChatId, apiBase = "https://api.telegram.org", fetchImpl = globalThis.fetch }) {
+  return async (text) => {
+    if (!token || ownerChatId === null || ownerChatId === undefined) return false;
+    try {
+      const r = await fetchImpl(`${apiBase}/bot${token}/sendMessage`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id: ownerChatId, text: redact(text).slice(0, 4000), disable_web_page_preview: true }), signal: AbortSignal.timeout(20_000) });
+      return r.ok;
+    } catch (_) { return false; }
+  };
+}
+
 export function makeTelegramBot({ token, ownerChatId, priors, ctx, model = null, apiBase = "https://api.telegram.org", fetchImpl = globalThis.fetch, log = null }) {
   const api = async (method, body) => {
     const r = await fetchImpl(`${apiBase}/bot${token}/${method}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(method === "getUpdates" ? 65_000 : 20_000) });

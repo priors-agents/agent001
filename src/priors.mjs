@@ -18,7 +18,7 @@ export class ToolFailed extends Error {
 }
 
 /** The server's environment: the key, the RPC, the agent and agent001's caps as its ceilings. */
-export function serverEnv({ key, rpc, agentId, caps, home, allowLocal = false }) {
+export function serverEnv({ key, rpc, agentId, caps, home, sandbox = false }) {
   const env = {
     ...getDefaultEnvironment(),
     PRIORS_RPC: rpc,
@@ -26,11 +26,12 @@ export function serverEnv({ key, rpc, agentId, caps, home, allowLocal = false })
     PRIORS_MAX_BORROW_TOTAL_USD: String(caps.maxOpenBorrowUsd),
     PRIORS_MAX_PRICE_USD: String(caps.maxPriceUsd),
     PRIORS_MAX_SPEND_USD: String(caps.maxSpendPerDayUsd),
-    PRIORS_STATE_DIR: join(home, "priors-mcp"),
+    // the payments it signed and not yet settled, kept apart for the sandbox so a fork's never meet mainnet's
+    PRIORS_STATE_DIR: join(home, sandbox ? "priors-mcp-sandbox" : "priors-mcp"),
   };
   if (key) env.PRIORS_KEY = key;
   if (agentId !== null && agentId !== undefined) env.PRIORS_AGENT_ID = String(agentId);
-  if (allowLocal) env.PRIORS_ALLOW_LOCAL = "1";
+  if (sandbox) env.PRIORS_ALLOW_LOCAL = "1"; // the sandbox's services run on localhost
   return env;
 }
 

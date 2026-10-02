@@ -16,7 +16,7 @@ export const DEFAULTS = Object.freeze({
     maxSpendPerDayUsd: 1, //  most x402 payments may total in a UTC day
   },
   autopilot: {
-    repayHoursBeforeDue: 24, // repay every loan at least this long before it is due
+    repayHoursBeforeDue: 24, // repay every loan once it is within this many hours of its due date
     borrow: false, //           true: keep one loan open to build the record (borrow, hold, repay before due, again)
     borrowUsd: 5,
     borrowDays: 8, //           8 days repaid a day early: held 7, which counts as a seasoned loan for the score

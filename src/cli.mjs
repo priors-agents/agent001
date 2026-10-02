@@ -1,7 +1,6 @@
 // The commands. Each takes its arguments (after the command name) and returns an exit code:
 // 0 done, 1 failed, 2 usage, 3 waiting on something outside agent001 (an invite, funds).
 import { ethers } from "ethers";
-import { rmSync } from "node:fs";
 import { homeDir, ensureHome, pathOf } from "./home.mjs";
 import { createWallet } from "./wallet.mjs";
 import { saveConfig, PUBLIC_RPC } from "./config.mjs";
@@ -14,9 +13,9 @@ import { makeService, listen } from "./service.mjs";
 import { localFacilitator } from "./facilitator-local.mjs";
 import { registerMerchant, loadMerchant } from "./merchant.mjs";
 import { priorsFacilitatorClient } from "@priors/x402";
-import { readJson } from "./home.mjs";
+import { readJson, writeJson } from "./home.mjs";
 import { converse, modelFromEnv } from "./brain.mjs";
-import { makeTelegramBot } from "./telegram.mjs";
+import { makeTelegramBot, makeOwnerNotifier } from "./telegram.mjs";
 import { createInterface } from "node:readline/promises";
 import { startFork, setUpSandbox, sandboxInvite, warp, fund } from "./sandbox.mjs";
 import { creditStatus } from "@priors/x402/credit";
@@ -67,8 +66,15 @@ export const commands = {
     const a = parseArgs(argv, { values: ["port", "fork-url"] });
     const home = ensureHome(homeDir());
     const fork = await startFork({ port: Number(a.port || 8545), forkUrl: a["fork-url"] || PUBLIC_RPC, log: (m) => out(m) });
-    const stop = () => { fork.stop(); try { rmSync(pathOf(home, "sandbox.json"), { force: true }); } catch (_) { /* gone */ } };
-    process.on("SIGINT", () => { stop(); out("\nsandbox stopped."); process.exit(0); });
+    // Stopped, the sandbox stays on record as stopped: commands refuse until it is restarted or sandbox.json is
+    // deleted, so none of them quietly runs against mainnet instead.
+    const stop = () => {
+      fork.stop();
+      const p = pathOf(home, "sandbox.json");
+      const sb = readJson(p);
+      if (sb) writeJson(p, { rpc: sb.rpc, stopped: true, stoppedAt: new Date().toISOString(), note: "this sandbox was stopped: start a new one with `agent001 sandbox`, or delete this file to use mainnet" });
+    };
+    process.on("SIGINT", () => { stop(); out(`\nsandbox stopped. Commands refuse to run until you start it again, or delete ${pathOf(home, "sandbox.json")} to use mainnet.`); process.exit(0); });
     process.on("SIGTERM", () => { stop(); process.exit(0); });
     try {
       let address = null;
@@ -100,13 +106,13 @@ export const commands = {
         const id = Number(a.agent);
         if (!Number.isSafeInteger(id) || id < 0) throw usageError("--agent takes an agent id");
         if ((await ownerOf(ctx.provider, id)) !== me) throw new Error(`agent #${id} is not owned by this wallet (${me})`);
-        saveConfig(ctx.home, { agentId: id }); ctx.agentId = id;
+        ctx.saveAgentId(id);
         out(`${banner(ctx)}using agent #${id}.`);
       }
       if (ctx.agentId === null) {
         out(`${banner(ctx)}registering an ERC-8004 identity for ${me}...`);
         const r = await register(ctx.wallet);
-        saveConfig(ctx.home, { agentId: r.agentId }); ctx.agentId = r.agentId;
+        ctx.saveAgentId(r.agentId);
         out(`${banner(ctx)}registered agent #${r.agentId} (tx ${r.hash}).`);
       }
       const id = ctx.agentId;
@@ -162,7 +168,7 @@ export const commands = {
       const s = await creditStatus(contractsFor(ctx.provider), id);
       checkBorrow(ctx.cfg.caps, amount, s.openLoans.reduce((t, l) => t + Number(ethers.formatUnits(l.principal, 6)), 0));
       out(banner(ctx) + (await (await ctx.priors()).call("borrow", { amount_usd: amount, days })));
-      out(`agent001 autopilot repays it at least ${ctx.cfg.autopilot.repayHoursBeforeDue} h before it is due.`);
+      out(`agent001 autopilot repays it once it is within ${ctx.cfg.autopilot.repayHoursBeforeDue} h of its due date.`);
       return 0;
     });
   },
@@ -187,7 +193,7 @@ export const commands = {
         out(`${banner(ctx)}autopilot pass: ${r.open} loan(s) were open; ${r.done.length ? r.done.map((d) => (d.type === "repay" ? `repaid #${d.loanId}` : `borrowed $${d.amountUsd}`)).join(", ") : "nothing to do"}${r.warnings.length ? ` (${r.warnings.length} warning(s) above)` : ""}`);
         return 0;
       }
-      out(`${banner(ctx)}autopilot running every ${ctx.cfg.autopilot.everyMinutes} min (repays ${ctx.cfg.autopilot.repayHoursBeforeDue} h before due${ctx.cfg.autopilot.borrow ? `, keeps a $${ctx.cfg.autopilot.borrowUsd} loan open for ${ctx.cfg.autopilot.borrowDays} days` : ""}). Ctrl-C stops it.`);
+      out(`${banner(ctx)}autopilot running every ${ctx.cfg.autopilot.everyMinutes} min (repays each loan within ${ctx.cfg.autopilot.repayHoursBeforeDue} h of its due date${ctx.cfg.autopilot.borrow ? `, keeps a $${ctx.cfg.autopilot.borrowUsd} loan open for ${ctx.cfg.autopilot.borrowDays} days` : ""}). Ctrl-C stops it.`);
       const ac = new AbortController();
       process.on("SIGINT", () => ac.abort());
       await run(base, { signal: ac.signal });
@@ -262,8 +268,8 @@ export const commands = {
       const priors = await ctx.priors();
       const history = [];
       const ask = (q) => converse({ model, history, userText: q, priors, owner: true, ctx, maxSteps: ctx.cfg.brain.maxSteps, log: ctx.log });
-      if (model.basic) out("(no language model configured: the basic brain answers questions about this agent's own record)");
-      if (question) { out(await ask(question)); return 0; }
+      if (model.basic) out(`${banner(ctx)}(no language model configured: the basic brain answers questions about this agent's own record)`);
+      if (question) { out(banner(ctx) + (await ask(question))); return 0; }
       out(`${banner(ctx)}chatting with agent001${ctx.agentId !== null ? ` #${ctx.agentId}` : ""} (you are its owner here). Empty line or Ctrl-D ends.`);
       const rl = createInterface({ input: process.stdin, output: process.stdout });
       try {
@@ -311,8 +317,7 @@ export const commands = {
         const model = modelFromEnv(ctx.cfg);
         bot = makeTelegramBot({ token, ownerChatId: ctx.cfg.telegram.ownerChatId, priors, ctx, model, log: ctx.log });
       }
-      const owner = ctx.cfg.telegram.ownerChatId;
-      const notify = async (text) => { if (token && owner) await fetch(`https://api.telegram.org/bot${token}/sendMessage`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id: owner, text }) }).catch(() => {}); };
+      const notify = makeOwnerNotifier({ token, ownerChatId: ctx.cfg.telegram.ownerChatId });
       out(`${banner(ctx)}agent001 #${agentId} running: the autopilot every ${ctx.cfg.autopilot.everyMinutes} min${bot ? ", Telegram" : ""}. Ctrl-C stops it.`);
       await Promise.all([
         run({ provider: ctx.provider, priors, cfg: ctx.cfg, agentId, address: ctx.address, log: ctx.log, notify }, { signal: ac.signal }),

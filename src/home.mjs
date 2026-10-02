@@ -3,7 +3,8 @@
 //   wallet.json   the agent's key (owner-only, 0600). It leaves this file only for the Priors MCP server's environment.
 //   config.json   the agent id, the RPC, the caps, the autopilot, the service, the brain and the Telegram owner.
 //   state.json    what the autopilot and the caps remember between runs (today's spend, the last actions).
-//   sandbox.json  only while a local fork runs (`agent001 sandbox`): its RPC and its fork-only inviter.
+//   sandbox.json  from `agent001 sandbox` on: the fork's RPC, its fork-only keys and the sandbox agent's id; once the
+//                 sandbox is stopped it says so, and commands refuse until a new one starts or the file is deleted.
 //   agent001.log  what the agent did, the key always redacted.
 import { mkdirSync, readFileSync, writeFileSync, renameSync, chmodSync } from "node:fs";
 import { join, resolve } from "node:path";

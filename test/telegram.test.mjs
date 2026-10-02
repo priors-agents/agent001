@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { makeTelegramBot } from "../src/telegram.mjs";
+import { makeTelegramBot, makeOwnerNotifier } from "../src/telegram.mjs";
+import { addSecret } from "../src/secrets.mjs";
 import { DEFAULTS } from "../src/config.mjs";
 
 const OWNER = 1111, STRANGER = 2222;
@@ -76,4 +77,20 @@ test("in conversation, a non-owner's model is not offered the money tools, and a
   assert.equal(offered[0].includes("pay_url"), false);
   assert.equal(offered[0].includes("credit_status"), true);
   assert.match(h.sent[0].text, /result: refused: borrow moves money, and only this agent's owner can ask for that/);
+});
+
+test("the autopilot's alerts to the owner (agent001 run) are redacted like every other message, and go to the owner only", async () => {
+  const bodies = [];
+  const fetchImpl = async (url, init) => { bodies.push({ url, body: JSON.parse(init.body) }); return new Response(JSON.stringify({ ok: true, result: {} })); };
+  const secret = "0x" + "5e".repeat(32);
+  addSecret(secret);
+  const notify = makeOwnerNotifier({ token: "123456:test-token-not-real", ownerChatId: OWNER, fetchImpl });
+  await notify(`loan #7 is due; debug ${secret}`);
+  assert.equal(bodies.length, 1);
+  assert.equal(bodies[0].body.chat_id, OWNER);
+  assert.equal(JSON.stringify(bodies[0].body).includes("5e5e5e5e"), false);
+  assert.match(bodies[0].body.text, /loan #7 is due; debug <redacted>/);
+  // no owner configured: nothing is sent anywhere
+  await makeOwnerNotifier({ token: "123456:test-token-not-real", ownerChatId: null, fetchImpl })("x");
+  assert.equal(bodies.length, 1);
 });

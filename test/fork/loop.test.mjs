@@ -7,7 +7,7 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, execFile } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -38,6 +38,7 @@ const run = async (args, extraEnv = {}) => {
 };
 
 const key = () => JSON.parse(readFileSync(join(dir, ".agent001", "wallet.json"), "utf8")).privateKey;
+const sandboxAgentId = () => JSON.parse(readFileSync(join(dir, ".agent001", "sandbox.json"), "utf8")).agentId;
 const provider = () => new ethers.JsonRpcProvider(`http://127.0.0.1:${PORT}`, 4663, { staticNetwork: true });
 
 before(async () => {
@@ -62,6 +63,11 @@ test("join: an ERC-8004 identity and a $5 treasury line, from an invite", async 
   assert.match(r.out, /joined Priors: a \$5\.00 line backed by the treasury \(#6228\)/);
   const again = await run(["join"]);
   assert.match(again.out, /already has a line of \$5\.00/);
+  // the sandbox's agent exists only on the fork: its id is kept with the sandbox, never in the mainnet config
+  const id = Number(/registered agent #(\d+)/.exec(r.out)[1]);
+  assert.equal(sandboxAgentId(), id);
+  const cfgPath = join(dir, ".agent001", "config.json");
+  assert.equal(existsSync(cfgPath) ? JSON.parse(readFileSync(cfgPath, "utf8")).agentId ?? null : null, null);
 });
 
 test("caps: a borrow above agent001's cap is refused before anything is sent", async () => {
@@ -72,7 +78,7 @@ test("caps: a borrow above agent001's cap is refused before anything is sent", a
 });
 
 test("caps: the Priors MCP server holds the same ceilings on its own", async () => {
-  const agentId = JSON.parse(readFileSync(join(dir, ".agent001", "config.json"), "utf8")).agentId;
+  const agentId = sandboxAgentId();
   const priors = await connectPriors({ key: key(), rpc: `http://127.0.0.1:${PORT}`, agentId, caps: DEFAULTS.caps, home: join(dir, ".agent001") });
   try {
     await assert.rejects(priors.call("borrow", { amount_usd: 6, days: 8 }), (e) => e instanceof ToolFailed && /above this server's ceiling of 5\.00 USDG \(PRIORS_MAX_BORROW_USD\)/.test(e.text));
@@ -154,12 +160,12 @@ test("chat: a scripted model's tool call runs through the MCP client and @priors
   });
   await new Promise((r) => api.listen(0, "127.0.0.1", r));
   const cfgPath = join(dir, ".agent001", "config.json");
-  const cfg = JSON.parse(readFileSync(cfgPath, "utf8"));
+  const cfg = existsSync(cfgPath) ? JSON.parse(readFileSync(cfgPath, "utf8")) : {};
   writeFileSync(cfgPath, JSON.stringify({ ...cfg, brain: { provider: "anthropic", model: "claude-test", baseUrl: `http://127.0.0.1:${api.address().port}` } }));
   try {
     const r = await run(["chat", "what is my record?"], { ANTHROPIC_API_KEY: "test-key-not-a-real-anthropic-key" });
     assert.equal(r.code, 0, r.out);
-    assert.match(r.out, new RegExp(`From Priors: Agent #${cfg.agentId} \\(owner 0x[0-9a-fA-F]{40}\\)`));
+    assert.match(r.out, new RegExp(`From Priors: Agent #${sandboxAgentId()} \\(owner 0x[0-9a-fA-F]{40}\\)`));
     assert.match(r.out, /Record: 1 loans repaid \(1 qualified\)/);
     assert.equal(requests.length, 2);
     assert.equal(requests[0].key, "test-key-not-a-real-anthropic-key");
@@ -186,6 +192,10 @@ test("the wallet key never appears in any output, the log, or any file but walle
   await new Promise((r) => srv.listen(0, "127.0.0.1", r));
   const logFile = join(dir, ".agent001", "agent001.log");
   const before = readFileSync(logFile, "utf8").length;
+  // off the sandbox, the agent id comes from config.json (the sandbox keeps its own): give this run one
+  const cfgPath = join(dir, ".agent001", "config.json");
+  const cfgBefore = existsSync(cfgPath) ? readFileSync(cfgPath, "utf8") : null;
+  writeFileSync(cfgPath, JSON.stringify({ ...(cfgBefore ? JSON.parse(cfgBefore) : {}), agentId: sandboxAgentId() }));
   const loop = spawn(process.execPath, [BIN, "autopilot"], { cwd: dir, env: { ...env, AGENT001_RPC: `http://127.0.0.1:${srv.address().port}/${key()}` } });
   let loopOut = "";
   loop.stdout.on("data", (d) => { loopOut += d; }); loop.stderr.on("data", (d) => { loopOut += d; });
@@ -195,8 +205,9 @@ test("the wallet key never appears in any output, the log, or any file but walle
     assert.match(logged, /autopilot pass failed: .*<redacted>/, "the failure quoted the URL, and so the key, redacted");
   } finally {
     loop.kill("SIGINT");
-    await new Promise((r) => loop.on("exit", r));
+    await new Promise((r) => (loop.exitCode !== null || loop.signalCode !== null ? r() : loop.on("exit", r)));
     srv.close();
+    if (cfgBefore === null) writeFileSync(cfgPath, "{}"); else writeFileSync(cfgPath, cfgBefore);
     transcript.push(loopOut);
   }
   // and a key on the command line is refused without being echoed
@@ -211,4 +222,15 @@ test("the wallet key never appears in any output, the log, or any file but walle
   const all = transcript.join("\n").toLowerCase();
   assert.ok(all.length > 1000);
   assert.equal(all.includes(body), false, "the key is in a command's output");
+});
+
+test("once the sandbox is stopped, every command refuses until it is restarted: none falls back to mainnet", async () => {
+  sandbox.kill("SIGINT");
+  await new Promise((r) => (sandbox.exitCode !== null ? r() : sandbox.on("exit", r)));
+  for (const args of [["status"], ["borrow", "1", "--days", "8"], ["chat", "what is my record?"]]) {
+    const r = await run(args, { ANTHROPIC_API_KEY: "" });
+    assert.equal(r.code, 1, `${args[0]}: ${r.out}`);
+    assert.match(r.out, /the sandbox .* is not running/, args[0]);
+    assert.doesNotMatch(r.out, /no line yet|priors\.trade\/api\/check/, args[0]);
+  }
 });

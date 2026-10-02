@@ -1,7 +1,7 @@
 // The credit autopilot: keeps the agent's Priors record clean.
 //
-// Every pass it reads the agent's open loans from the chain and repays each one at least
-// autopilot.repayHoursBeforeDue before its due date. A loan repaid late is on the record for good, and three days late
+// Every pass it reads the agent's open loans from the chain and repays each one once it is within
+// autopilot.repayHoursBeforeDue of its due date. A loan repaid late is on the record for good, and three days late
 // anyone can mark it defaulted (the record burnt, the backer paying). If the wallet cannot cover a repayment that is
 // due soon, it says so loudly (the log, and the owner on Telegram) while there is still time.
 //
