@@ -1,0 +1,6 @@
+node_modules/
+# agent001's own folder: the wallet key, its config and state. Never commit it.
+.agent001/
+.env
+.env.*
+*.log
