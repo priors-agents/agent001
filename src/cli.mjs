@@ -5,7 +5,7 @@ import { homeDir, ensureHome, pathOf } from "./home.mjs";
 import { createWallet } from "./wallet.mjs";
 import { saveConfig, PUBLIC_RPC } from "./config.mjs";
 import { makeContext } from "./context.mjs";
-import { ADDR, usd } from "./chain.mjs";
+import { ADDR, usd, makeProvider, isSandbox } from "./chain.mjs";
 import { register, ownerOf, lineOf, redeemInvite, postBond, requestInvite } from "./join.mjs";
 import { tick, run, contractsFor } from "./autopilot.mjs";
 import { checkBorrow, checkPay, recordSpend } from "./caps.mjs";
@@ -57,6 +57,14 @@ export const commands = {
     out(`Its key is in ${pathOf(home, "wallet.json")} (owner-only). Never share that file; agent001 never prints the key.`);
     out("");
     out("Next:");
+    // a folder pointed at a running sandbox (AGENT001_RPC, as in the buyer recipe) needs neither hint below
+    const rpc = process.env.AGENT001_RPC?.trim();
+    if (rpc) {
+      const p = makeProvider(rpc);
+      const onFork = await isSandbox(p);
+      p.destroy();
+      if (onFork) { out(`  this folder uses the sandbox at ${rpc}: agent001 fund, then agent001 join`); return 0; }
+    }
     out("  try it on a local fork with play money:   agent001 sandbox      (in another terminal; needs Foundry's anvil)");
     out(`  or on mainnet: send this address a little ETH on Robinhood Chain for gas and 6 USDG (5 for the invite bond, 1 for fees), then agent001 join --bond`);
     return 0;
