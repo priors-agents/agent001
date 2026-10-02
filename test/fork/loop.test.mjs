@@ -15,7 +15,8 @@ import { fileURLToPath } from "node:url";
 import { ethers } from "ethers";
 import { connectPriors, ToolFailed } from "../../src/priors.mjs";
 import { DEFAULTS } from "../../src/config.mjs";
-import { creditContracts, LOAN_STATUS } from "@priors/x402/credit";
+import { creditContracts, stockAssets, LOAN_STATUS } from "@priors/x402/credit";
+import { STOCKS } from "../../src/service.mjs";
 
 const BIN = fileURLToPath(new URL("../../bin/agent001.mjs", import.meta.url));
 const PORT = 8600 + Math.floor(Math.random() * 300);
@@ -95,6 +96,9 @@ test("x402: another agent pays agent001's quote service, the payment settles on 
     assert.equal((await run(["fund", "--usdg", "1"], buyerEnv)).code, 0);
     const buyer = JSON.parse(readFileSync(join(buyerDir, ".agent001", "wallet.json"), "utf8")).address;
     const usdg = new ethers.Contract("0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", ["function balanceOf(address) view returns (uint256)", "event Transfer(address indexed from, address indexed to, uint256 value)"], provider());
+    // warm the fork's cache for the quote's chain reads (a cold fork fetches every slot from the public RPC)
+    const aapl = STOCKS.find((a) => a.symbol === "AAPL");
+    await stockAssets(creditContracts({ runner: provider() }), [aapl]);
     const before = await usdg.balanceOf(seller);
     const r = await run(["pay", `http://127.0.0.1:${port}/quote?symbol=AAPL`, "--max", "0.01"], buyerEnv);
     assert.equal(r.code, 0, r.out);

@@ -4,9 +4,14 @@
 // agent001's caps are passed as the server's own ceilings, and checked here again before each call (src/caps.mjs).
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { join } from "node:path";
 import { MCP_BIN } from "./chain.mjs";
 import { redact } from "./secrets.mjs";
+
+// Longer than the server's own deadlines (pay_url answers within 45 s of the merchant; borrow and repay wait for their
+// receipts): a client that gave up first would report a money move as failed while it may have gone through.
+export const TOOL_TIMEOUT_MS = 180_000;
 
 export class ToolFailed extends Error {
   constructor(tool, text) { super(`${tool}: ${text}`); this.name = "ToolFailed"; this.tool = tool; this.text = text; }
@@ -43,7 +48,7 @@ export async function connectPriors(opts, { log = null } = {}) {
     client,
     async tools() { return (await client.listTools()).tools; },
     async call(name, args = {}) {
-      const r = await client.callTool({ name, arguments: args });
+      const r = await client.callTool({ name, arguments: args }, CallToolResultSchema, { timeout: TOOL_TIMEOUT_MS });
       const text = redact((r.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n"));
       if (r.isError) throw new ToolFailed(name, text);
       return text;
