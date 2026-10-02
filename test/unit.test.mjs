@@ -10,6 +10,7 @@ import { loadConfig, DEFAULTS } from "../src/config.mjs";
 import { planTick } from "../src/autopilot.mjs";
 import { addSecret, redact } from "../src/secrets.mjs";
 import { parseInvite, isProofMessage } from "../src/join.mjs";
+import { createWallet, loadWallet, walletAddress } from "../src/wallet.mjs";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "agent001-"));
 const caps = { ...DEFAULTS.caps, maxBorrowUsd: 5, maxOpenBorrowUsd: 8, maxPriceUsd: 0.1, maxSpendPerDayUsd: 0.25 };
@@ -93,6 +94,19 @@ test("redaction: a registered key never survives, with or without 0x, in any cas
   // a transaction hash (also 64 hex digits) is left alone
   const tx = ethers.hexlify(ethers.randomBytes(32));
   assert.equal(redact(`tx ${tx}`), `tx ${tx}`);
+});
+
+test("a wallet key from AGENT001_WALLET_KEY (a hosting platform's secret) replaces wallet.json, and is never echoed", () => {
+  const home = tmp();
+  const k = ethers.Wallet.createRandom();
+  const env = { AGENT001_WALLET_KEY: k.privateKey };
+  assert.equal(loadWallet(home, null, env).address, k.address);
+  assert.equal(walletAddress(home, env), k.address);
+  assert.throws(() => createWallet(home, env), /AGENT001_WALLET_KEY is set/);
+  const bad = "0x" + "zz".repeat(32);
+  assert.throws(() => loadWallet(home, null, { AGENT001_WALLET_KEY: bad }), (e) => /not a valid private key/.test(e.message) && !e.message.includes("zzzz"));
+  // without it, the file as before
+  assert.throws(() => loadWallet(home, null, {}), /no wallet yet/);
 });
 
 test("invites: the code is checked before anything is sent; only the exact ownership proof is ever signed", () => {

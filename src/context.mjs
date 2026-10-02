@@ -29,11 +29,11 @@ export async function makeContext({ env = process.env, quiet = false, needWallet
     rpc = sb.rpc; sandbox = true;
   } else if (env.AGENT001_RPC) { const p = makeProvider(rpc); sandbox = await isSandbox(p); p.destroy(); }
   const provider = makeProvider(rpc);
-  const wallet = needWallet ? loadWallet(home, provider) : null;
+  const wallet = needWallet ? loadWallet(home, provider, env) : null;
   let priors = null;
   const ctx = {
     home, cfg, log, rpc, sandbox, provider, wallet,
-    address: wallet ? wallet.address : walletAddress(home),
+    address: wallet ? wallet.address : walletAddress(home, env),
     agentId: sandbox ? (sb?.agentId ?? null) : cfg.agentId,
     /** Remember the agent id: in sandbox.json on a sandbox, in config.json otherwise. */
     saveAgentId(id) {

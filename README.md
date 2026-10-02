@@ -106,6 +106,43 @@ agent001 merchant register --url https://your-tunnel.example.com   # one signatu
 agent001 serve
 ```
 
+**Choosing who may buy.** With `service.payerPolicy` in `.agent001/config.json`, the service reads each buyer's
+Priors record before the facilitator sees the payment. For example, `{ "refuseDefaulted": true }` refuses agents that
+defaulted on a Priors loan, and `"minRepaid": 1` asks for at least one repaid loan. A refused buyer gets a 402 with the
+reason, and nothing is charged. On mainnet the record comes from the free check API, by the buyer's address. In the
+sandbox it comes from the fork's own pool, for the agent the buyer names in an `X-Priors-Agent` header. `@priors/mcp`'s
+`pay_url` sends no such header yet, so in the sandbox use `refuseDefaulted` alone for buyers that pay with it.
+
+## Run it for good: Docker, Railway, Fly
+
+An agent builds its record by being there when its loans come due, so on mainnet run it somewhere that stays up.
+The image runs `agent001 run` (the autopilot, and Telegram when `TELEGRAM_BOT_TOKEN` is set). Its folder lives on a
+volume at `/data`, and the image never holds a key.
+
+**Docker** (any server or a home machine):
+
+```bash
+docker build -t agent001 .
+docker run --rm -it -v agent001-data:/data agent001 init         # once: the wallet, kept on the volume (owner-only)
+docker run --rm -it -v agent001-data:/data agent001 join --bond  # once funded
+docker run -d --restart unless-stopped --name agent001 -v agent001-data:/data -e TELEGRAM_BOT_TOKEN agent001
+```
+
+Or `docker compose run --rm agent001 init`, `docker compose run --rm agent001 join --bond`, then `docker compose up -d`
+with [`docker-compose.yml`](docker-compose.yml).
+
+**Railway:** create a project from this repository; [`railway.json`](railway.json) builds the Dockerfile. Add a volume
+mounted at `/data`, then either open a shell on the service and run `node /app/bin/agent001.mjs init` and `join --bond`
+there, or set the wallet's key as the service variable `AGENT001_WALLET_KEY` (then run `join --bond` from the shell once).
+
+**Fly.io:** `fly launch --copy-config --no-deploy` (choose your own app name), `fly volumes create agent001_data --size 1`,
+`fly secrets set AGENT001_WALLET_KEY=0x…` (or `fly ssh console` and `init` on the volume), then `fly deploy`; see
+[`fly.toml`](fly.toml). Run one machine: two autopilots on one wallet would race each other.
+
+`AGENT001_WALLET_KEY`, when set, replaces `.agent001/wallet.json`: it is how hosting platforms hand a secret to a
+container. It is never printed, like the file. Use it only where the platform keeps secrets, and prefer the volume
+file anywhere you have a shell.
+
 ## Talking to it
 
 `agent001 chat` uses Claude when `ANTHROPIC_API_KEY` is set, or any OpenAI-compatible endpoint (OpenAI, OpenRouter, a
@@ -143,6 +180,7 @@ and the model is not even offered the money tools.
 | `autopilot.borrowUsd`, `borrowDays` | 5, 8 | that loan: 8 days repaid a day early is held 7, a "seasoned" loan for the score |
 | `autopilot.everyMinutes` | 30 | how often `run` and `autopilot` check |
 | `service.port`, `service.priceUsd` | 4021, 0.01 | the quote service |
+| `service.payerPolicy` | none | the Priors record a buyer needs, e.g. `{ "refuseDefaulted": true, "minRepaid": 1 }` (`@priors/x402`'s record gate: checked before the facilitator sees the payment, so a refused payment moves nothing) |
 | `brain.provider`, `brain.model`, `brain.baseUrl` | anthropic, claude-sonnet-5-5, none | the model (`openai` for any OpenAI-compatible endpoint, `basic` for none) |
 | `telegram.ownerChatId` | none | the only chat that can move money |
 | `rpc` | `https://rpc.mainnet.chain.robinhood.com` | Robinhood Chain's JSON-RPC (`AGENT001_RPC` overrides it) |

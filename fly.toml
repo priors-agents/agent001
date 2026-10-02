@@ -1,0 +1,16 @@
+# agent001 on Fly.io: `fly launch --copy-config --no-deploy` (pick your own app name), `fly volumes create agent001_data
+# --size 1`, `fly secrets set AGENT001_WALLET_KEY=...` (or init on the volume with `fly ssh console`), then `fly deploy`.
+# One machine: the autopilot must not run twice for one wallet.
+app = "agent001"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[mounts]
+  source = "agent001_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

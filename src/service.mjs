@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
 import { paymentMiddleware } from "@x402/express";
-import { createResourceServer, robinhood } from "@priors/x402";
+import { createResourceServer, recordGate, robinhood } from "@priors/x402";
 import { creditContracts, stockAssets } from "@priors/x402/credit";
 import { ADDR, SITE } from "./chain.mjs";
 
@@ -22,8 +22,10 @@ const bySymbol = new Map(STOCKS.map((a) => [a.symbol.toUpperCase(), a]));
 /**
  * The service as an express app. `facilitatorClient`: the Priors facilitator (with the merchant API key) on mainnet,
  * the local one in the sandbox. Settlement happens before the quote is sent: no quote without a settled payment.
+ * `payerPolicy` (config service.payerPolicy, e.g. { refuseDefaulted: true, minRepaid: 1 }): the payer's Priors record
+ * is checked before the facilitator sees the payment (@priors/x402's recordGate); a refused payment moves nothing.
  */
-export function makeService({ provider, payTo, priceUsd, facilitatorClient, agentId = null, log = null }) {
+export function makeService({ provider, payTo, priceUsd, facilitatorClient, agentId = null, log = null, payerPolicy = null }) {
   const app = express();
   app.disable("x-powered-by");
   const price = `$${priceUsd}`;
@@ -42,6 +44,9 @@ export function makeService({ provider, payTo, priceUsd, facilitatorClient, agen
     next();
   });
   const server = createResourceServer({ facilitatorClient });
+  if (payerPolicy) {
+    recordGate({ ...payerPolicy, onDecision: (d) => { if (!d.ok) log?.info(`service: refused a payment from ${d.payer}: ${d.reason}`); } }).attach(server);
+  }
   app.use(paymentMiddleware({
     "GET /quote": {
       accepts: { scheme: "exact", price, network: robinhood.network, payTo, maxTimeoutSeconds: 120 },

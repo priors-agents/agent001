@@ -22,7 +22,9 @@ export const DEFAULTS = Object.freeze({
     borrowDays: 8, //           8 days repaid a day early: held 7, which counts as a seasoned loan for the score
     everyMinutes: 30,
   },
-  service: { port: 4021, priceUsd: 0.01, facilitator: "https://facilitator.priors.trade" },
+  // payerPolicy: null (everyone may buy), or the record a payer needs, e.g. { refuseDefaulted: true, minRepaid: 1 }
+  // (@priors/x402's recordGate: checked before the facilitator sees the payment)
+  service: { port: 4021, priceUsd: 0.01, facilitator: "https://facilitator.priors.trade", payerPolicy: null },
   brain: { provider: "anthropic", model: "claude-sonnet-5-5", baseUrl: null, maxSteps: 8 },
   telegram: { ownerChatId: null },
 });
@@ -49,6 +51,16 @@ export function validate(cfg) {
   if (cfg.autopilot.borrowDays * 24 <= cfg.autopilot.repayHoursBeforeDue) throw new Error("config: autopilot.borrowDays must be longer than autopilot.repayHoursBeforeDue");
   if (cfg.autopilot.borrowUsd > cfg.caps.maxBorrowUsd) throw new Error("config: autopilot.borrowUsd is above caps.maxBorrowUsd");
   positive(cfg.service.priceUsd, "service.priceUsd");
+  const pp = cfg.service.payerPolicy;
+  if (pp !== null) {
+    if (!isObj(pp)) throw new Error("config: service.payerPolicy must be null or an object like { \"refuseDefaulted\": true, \"minRepaid\": 1 }");
+    const known = new Set(["refuseDefaulted", "minRepaid", "minScore", "source"]);
+    for (const k of Object.keys(pp)) if (!known.has(k)) throw new Error(`config: service.payerPolicy.${k} is not a policy field (refuseDefaulted, minRepaid, minScore, source)`);
+    if (pp.refuseDefaulted !== undefined && typeof pp.refuseDefaulted !== "boolean") throw new Error("config: service.payerPolicy.refuseDefaulted must be true or false");
+    if (pp.minRepaid !== undefined && !(Number.isInteger(pp.minRepaid) && pp.minRepaid >= 0)) throw new Error("config: service.payerPolicy.minRepaid must be a whole number");
+    if (pp.minScore !== undefined && pp.minScore !== null && !(typeof pp.minScore === "number" && pp.minScore >= 0)) throw new Error("config: service.payerPolicy.minScore must be a number");
+    if (pp.source !== undefined && pp.source !== "api" && pp.source !== "chain") throw new Error("config: service.payerPolicy.source must be \"api\" or \"chain\"");
+  }
   if (cfg.agentId !== null && !(Number.isSafeInteger(cfg.agentId) && cfg.agentId >= 0)) throw new Error("config: agentId must be a whole number");
   if (cfg.telegram.ownerChatId !== null && !/^-?\d{1,20}$/.test(String(cfg.telegram.ownerChatId))) throw new Error("config: telegram.ownerChatId must be a Telegram chat id (digits)");
   if (!/^https?:\/\//.test(cfg.rpc)) throw new Error("config: rpc must be an http(s) URL");

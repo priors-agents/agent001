@@ -1,0 +1,19 @@
+# agent001 with Docker Compose. Once: `docker compose run --rm agent001 init`, fund the address it prints, then
+# `docker compose run --rm agent001 join --bond`. Then `docker compose up -d`: the autopilot (and the Telegram bot when
+# TELEGRAM_BOT_TOKEN is set) runs and restarts with the machine. Secrets come from your shell or a .env file next to
+# this one (never committed).
+services:
+  agent001:
+    build: .
+    image: agent001
+    restart: unless-stopped
+    command: ["run"]
+    volumes:
+      - agent001-data:/data
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
+volumes:
+  agent001-data:

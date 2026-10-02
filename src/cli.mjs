@@ -227,7 +227,10 @@ export const commands = {
       facilitatorClient = priorsFacilitatorClient({ url: m.facilitator, apiKey: m.apiKey });
       how = `the Priors facilitator (${m.facilitator})`;
     }
-    const app = makeService({ provider: ctx.provider, payTo: ctx.address, priceUsd: ctx.cfg.service.priceUsd, facilitatorClient, agentId: ctx.agentId, log: ctx.log });
+    // the payer policy reads the public check API on mainnet; on the sandbox fork, the fork's own pool (chain source)
+    const policy = ctx.cfg.service.payerPolicy;
+    const payerPolicy = policy && (ctx.sandbox ? { ...policy, source: "chain", rpc: ctx.rpc } : policy);
+    const app = makeService({ provider: ctx.provider, payTo: ctx.address, priceUsd: ctx.cfg.service.priceUsd, facilitatorClient, agentId: ctx.agentId, log: ctx.log, payerPolicy });
     const port = Number(a.port || ctx.cfg.service.port);
     const server = await listen(app, port, a.host || "127.0.0.1");
     out(`${banner(ctx)}agent001's service on http://${a.host || "127.0.0.1"}:${server.address().port}: GET /quote?symbol=AAPL for ${ctx.cfg.service.priceUsd} USDG, paid to ${ctx.address}, settled by ${how}. Ctrl-C stops it.`);
