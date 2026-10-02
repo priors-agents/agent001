@@ -1,8 +1,12 @@
 ---
 name: priors
 description: Check an AI agent's repayment record before you pay or trust it, pay x402 APIs in USDG on Robinhood Chain within caps, borrow the shortfall from a Priors credit line, and repay before the due date.
-version: 0.1.0
+version: 0.2.0
+author: priors-agents
+license: MIT-0
 metadata:
+  hermes:
+    tags: [payments, x402, credit, reputation, erc-8004, robinhood-chain, usdg, mcp]
   openclaw:
     emoji: "🧾"
     homepage: https://github.com/priors-agents/agent001/tree/main/skills/priors
@@ -63,7 +67,17 @@ reputation registry, from the Priors attester only (see https://github.com/prior
 
 ## 2. Set up the Priors MCP tools
 
-**Read-only (no key):** the hosted server answers record, score, pool and service questions.
+**Read-only (no key):** the hosted server `https://mcp.priors.trade/mcp` answers record, score, pool and service
+questions.
+
+In Hermes (answer `n` when it asks whether the server requires authentication):
+
+```bash
+hermes mcp add priors --url https://mcp.priors.trade/mcp
+hermes mcp test priors
+```
+
+In OpenClaw:
 
 ```bash
 openclaw mcp add priors --url https://mcp.priors.trade/mcp --transport streamable-http
@@ -71,18 +85,36 @@ openclaw mcp doctor priors --probe
 ```
 
 **With a wallet (to pay, borrow, repay):** the local server `@priors/mcp` signs with a key from `PRIORS_KEY`.
-Use a dedicated wallet that holds only what the agent may spend. Export `PRIORS_KEY` in the environment of the
-OpenClaw gateway (its service environment or `.env`), never as a literal in OpenClaw's config and never in a chat or a
-command line. Install the server once (a pinned version, and no download each time it starts), then add it:
+Use a dedicated wallet that holds only what the agent may spend. Install the server once (a pinned version, and no
+download each time it starts):
 
 ```bash
-npm install -g @priors/mcp@0.2.7
+npm install -g @priors/mcp@0.2.10
+```
+
+In Hermes, the user adds the line `PRIORS_KEY=0x…` with an editor to Hermes's env file (`hermes config env-path` prints
+where it is). The server's config holds only a reference to it (keep the single quotes, so the shell passes
+`${PRIORS_KEY}` through unexpanded):
+
+```bash
+hermes mcp add priors-wallet --command priors-mcp --env 'PRIORS_KEY=${PRIORS_KEY}'
+hermes mcp test priors-wallet
+```
+
+In OpenClaw, export `PRIORS_KEY` in the environment of the OpenClaw gateway (its service environment or `.env`), never
+as a literal in OpenClaw's config, then:
+
+```bash
 openclaw mcp add priors-wallet --command priors-mcp
 openclaw mcp doctor priors-wallet --probe
 ```
 
+Never write the key in a chat, on a command line or in Hermes's `config.yaml`, and never print, echo or log it:
+Hermes's terminal can read what is in its env file. Start a new session after adding a server.
+
 Tools: `score_of`, `credit_status`, `wallet_balance`, `find_services`, `stock_assets`, `stock_position` (read-only), and
-`pay_url`, `borrow`, `repay` (move real money on Robinhood Chain mainnet).
+`pay_url`, `borrow`, `repay` (move real money on Robinhood Chain mainnet). Hermes prefixes them with the server name,
+for example `mcp_priors_wallet_pay_url`.
 
 ## 3. Pay, borrow and repay: the rules
 
@@ -100,9 +132,20 @@ Tools: `score_of`, `credit_status`, `wallet_balance`, `find_services`, `stock_as
 ## Getting a credit line
 
 A wallet needs an ERC-8004 identity and a line before `borrow` works. The quickest path is
-[agent001](https://github.com/priors-agents/agent001): `agent001 join` registers the identity and opens a first $5 line
-(a 5 USDG bond and a signed ownership proof, both handled for you), and `agent001 autopilot` repays every loan before it
-is due. Try it first on a local fork with play money: `agent001 sandbox`.
+[agent001](https://github.com/priors-agents/agent001), run from a clone of its repository:
+
+```bash
+git clone https://github.com/priors-agents/agent001 && cd agent001 && npm ci
+node bin/agent001.mjs init          # the agent's wallet; its key stays in .agent001/wallet.json, never printed
+node bin/agent001.mjs join --bond   # registers the identity and opens a first $5 line
+node bin/agent001.mjs autopilot     # repays every loan before it is due
+```
+
+Never run `npx agent001`: an unrelated npm package has that name. Run every command from the clone's folder.
+`join --bond` locks a 5 USDG invite bond and signs the ownership proof for you; with a code from
+[priors.trade/invite](https://priors.trade/invite), use `join --invite <code>` instead. Try it first on a local fork
+with play money: `node bin/agent001.mjs sandbox` in a second terminal (it needs `anvil` from Foundry), then `join` in
+the first (see the agent001 README).
 
 Nothing in Priors has had a third-party audit; its known findings and fixes are public
 (https://github.com/priors-agents/priors/blob/main/docs/SECURITY-v2.md).

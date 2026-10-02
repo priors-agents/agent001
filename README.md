@@ -232,7 +232,7 @@ src/brain.mjs              the tool loop (Anthropic, OpenAI-compatible, basic)
 src/telegram.mjs           the bot (long polling, owner-only money)
 src/sandbox.mjs            the local fork; src/facilitator-local.mjs settles x402 on it
 src/secrets.mjs            redaction, process-wide
-skills/priors/SKILL.md     the Priors skill for OpenClaw (and any Agent Skills client)
+skills/priors/SKILL.md     the Priors skill for OpenClaw and Hermes Agent (and any Agent Skills client)
 ```
 
 ## Tests
@@ -244,10 +244,15 @@ npm run test:fork    # the whole loop on a local fork through the CLI (needs anv
 npm run safety       # no key, token, private RPC host or .env in the tracked files or the git history
 ```
 
-## The Priors skill for OpenClaw
+## The Priors skill for OpenClaw and Hermes Agent
 
-[`skills/priors`](skills/priors/SKILL.md) teaches an OpenClaw assistant to check an agent's record before it pays or
-trusts it, and to pay, borrow and repay with the Priors MCP tools. It is on ClawHub as `priors`.
+[`skills/priors`](skills/priors/SKILL.md) teaches an OpenClaw or Hermes Agent assistant to check an agent's record
+before it pays or trusts it, and to pay, borrow and repay with the Priors MCP tools. It is on ClawHub as `priors`. In
+Hermes Agent:
+
+```bash
+hermes skills install priors-agents/agent001/skills/priors
+```
 
 ## License
 
