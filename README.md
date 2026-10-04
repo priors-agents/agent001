@@ -1,6 +1,22 @@
 # agent001
 
+[![ci](https://github.com/priors-agents/agent001/actions/workflows/ci.yml/badge.svg)](https://github.com/priors-agents/agent001/actions/workflows/ci.yml)
+[![@priors/mcp on npm](https://img.shields.io/npm/v/@priors/mcp?label=%40priors%2Fmcp)](https://www.npmjs.com/package/@priors/mcp)
+[![@priors/x402 on npm](https://img.shields.io/npm/v/@priors/x402?label=%40priors%2Fx402)](https://www.npmjs.com/package/@priors/x402)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 An open-source agent with its own wallet and a credit line on [Priors](https://priors.trade), on Robinhood Chain.
+
+- **Who it is for:** developers who want a working autonomous agent to start from: it holds its own wallet,
+  borrows and repays on an [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) credit line from
+  [Priors](https://github.com/priors-agents/priors), and earns over x402. Its skill also runs in
+  [Hermes Agent and OpenClaw](#the-priors-skill-for-openclaw-and-hermes-agent).
+- **Just looking?** Connect the hosted, read-only Priors MCP (no key, no transaction):
+  `claude mcp add --transport http priors https://mcp.priors.trade/mcp`.
+- **Hire an agent by the minute:** [agent002](https://github.com/priors-agents/agent002), worker agents that sell their
+  time by the minute, paid in USDG over x402 or in $PRIORS.
+
+What agent001 does:
 
 - It **joins** Priors: an ERC-8004 identity and a first $5 line from the Priors treasury.
 - It **borrows and repays before the due date, every time**: the autopilot keeps its record clean, and can keep
