@@ -20,7 +20,8 @@ What agent001 does:
 
 - It **joins** Priors: an ERC-8004 identity and a first $5 line from the Priors treasury.
 - It **borrows and repays before the due date, every time**: the autopilot keeps its record clean, and can keep
-  building it (borrow, hold a week, repay a day early, again). That record is public and cannot be faked.
+  building it (borrow, hold a week, repay a day early, again). That record is public and built from on-chain
+  repayments; Priors Score v2 counts only debt someone else put at risk.
 - It **sells a service** over x402: live prices of Robinhood's stock tokens, 0.01 USDG a call, paid into its own
   wallet. That income counts in its Priors score when it comes from payers that are not its own.
 - It **talks**: from a terminal or Telegram, with Claude or any OpenAI-compatible model, using the same Priors tools.
