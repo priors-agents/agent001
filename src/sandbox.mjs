@@ -3,7 +3,8 @@
 // the local node. On the fork only:
 //   - the agent's wallet gets 1 ETH for gas and 20 USDG (written into the token's storage);
 //   - a fork-only inviter is named on the Priors treasury (by impersonating its owner, which anvil allows), so `join`
-//     gets its invite without the mainnet bond and Telegram proof;
+//     gets its invite without the mainnet bond and Telegram proof; when mainnet's lines have spent this week's cap on
+//     what the treasury vouches, the cap is raised the same way, so the invite is not refused;
 //   - a fork-only facilitator settles the agent's x402 sales (src/facilitator-local.mjs);
 //   - `agent001 warp <days>` moves the fork's clock, to watch the autopilot repay before a due date.
 import { spawn } from "node:child_process";
@@ -106,6 +107,15 @@ export async function sandboxInvite(provider, home, agentId) {
     inviter = ethers.Wallet.createRandom();
     await asImpersonated(provider, await t4.owner(), async (owner) => { await (await t4.connect(owner).setInviter(inviter.address, true)).wait(); });
     writeJson(path, { ...sb, inviterKey: inviter.privateKey });
+  }
+  // the fork starts with mainnet's epoch: in a week whose cap mainnet's lines have spent, the treasury refuses every
+  // invite (EpochCapReached). On the fork only, raise the cap by what the epoch has used, so it holds a fresh week's room
+  const [r, room] = await Promise.all([t4.rules(), t4.epochRoom()]);
+  if (room < r.firstLine) {
+    const used = await t4.vouchedThisEpoch();
+    await asImpersonated(provider, await t4.owner(), async (owner) => {
+      await (await t4.connect(owner).setRules([r.reserveBps, r.firstLine, r.secondLine, r.epochCap + used, r.epochLength, r.minSeasoning, r.minQualified, r.minScore, r.idleAfter])).wait();
+    });
   }
   const expiry = (await provider.getBlock("latest")).timestamp + 7 * 86400;
   const digest = await t4.inviteDigest(agentId, expiry);

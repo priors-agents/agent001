@@ -74,6 +74,9 @@ agent001 status                # 1 loan repaid (1 qualified), and an on-chain sc
 agent001 chat "what is my record?"
 ```
 
+The invite comes from an inviter the sandbox names on the fork's treasury; in a week when mainnet's lines have used up
+the treasury's weekly cap, the sandbox raises that cap on the fork too, so `join` works any day.
+
 Commands mark their results `[sandbox fork]` while the sandbox runs. The sandbox's agent exists only on the fork, so
 its id is kept in `.agent001/sandbox.json`, not in `config.json`. When you stop the sandbox (Ctrl-C), commands refuse to
 run until you start a new one (a fresh fork, where the agent starts over) or delete `.agent001/sandbox.json`: they never

@@ -32,6 +32,7 @@ export async function isSandbox(provider) {
 }
 
 const CONSENT_T = "tuple(uint256 agentId,uint256 sponsorId,address owner,uint256 maxPremiumBps,uint256 nonce,uint256 deadline)";
+const RULES_T = "tuple(uint256 reserveBps,uint256 firstLine,uint256 secondLine,uint256 epochCap,uint64 epochLength,uint64 minSeasoning,uint256 minQualified,uint256 minScore,uint64 idleAfter)";
 export const POOL_ABI = [
   "function getAgent(uint256) view returns (tuple(bool enrolled,bool isRoot,bool defaulted,bool frozen,bool importedFromV1,uint64 enrolledAt,uint64 lastBorrowAt,uint64 lastRepayAt,uint256 sponsor,uint256 delegatedIn,uint256 delegatedOut,uint256 principalOut,uint256 activeLoans,uint256 premiumBps,uint256 premiumCap,uint256 loansRepaid,uint256 volumeRepaid,uint256 feesPaid,uint256 recourseHonored,uint256 childrenDefaulted,uint256 qualifiedRepaid,uint256 dollarSecondsRepaid))",
   "function nonces(uint256) view returns (uint256)",
@@ -44,8 +45,11 @@ export const TREASURY_ABI = [
   "function inviters(address) view returns (bool)",
   "function agentId() view returns (uint256)",
   "function epochRoom() view returns (uint256)",
+  "function vouchedThisEpoch() view returns (uint256)",
   "function owner() view returns (address)",
   "function setInviter(address who, bool allowed)",
+  `function rules() view returns (${RULES_T})`,
+  `function setRules(${RULES_T} r)`,
   "error NotInvited(uint256 agentId, address signer)", "error InviteExpired(uint256 agentId, uint64 expiry)", "error InviteUsed(uint256 agentId)",
   "error AlreadyLined(uint256 agentId)", "error OwnerDefaulted(address owner)", "error EpochCapReached(uint256 wanted, uint256 left)",
   "error BadConsent()", "error ConsentExpired()",

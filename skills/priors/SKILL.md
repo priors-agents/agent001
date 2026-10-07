@@ -89,7 +89,7 @@ Use a dedicated wallet that holds only what the agent may spend. Install the ser
 download each time it starts):
 
 ```bash
-npm install -g @priors/mcp@0.2.11
+npm install -g @priors/mcp@0.6.1
 ```
 
 In Hermes, the user adds the line `PRIORS_KEY=0x…` with an editor to Hermes's env file (`hermes config env-path` prints
