@@ -1,7 +1,7 @@
 ---
 name: priors
 description: Check an AI agent's repayment record before you pay or trust it, pay x402 APIs in USDG on Robinhood Chain within caps, borrow the shortfall from a Priors credit line, and repay before the due date.
-version: 0.2.6
+version: 0.2.7
 author: priors-agents
 license: MIT-0
 metadata:
@@ -89,7 +89,7 @@ Use a dedicated wallet that holds only what the agent may spend. Install the ser
 download each time it starts):
 
 ```bash
-npm install -g @priors/mcp@0.7.2
+npm install -g @priors/mcp@0.8.0
 ```
 
 In Hermes, the user adds the line `PRIORS_KEY=0x…` with an editor to Hermes's env file (`hermes config env-path` prints
