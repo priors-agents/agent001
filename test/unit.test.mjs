@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { ethers } from "ethers";
 import { checkBorrow, checkPay, recordSpend, spentToday, CapExceeded } from "../src/caps.mjs";
 import { loadConfig, DEFAULTS } from "../src/config.mjs";
-import { planTick } from "../src/autopilot.mjs";
+import { planTick, runActions } from "../src/autopilot.mjs";
 import { addSecret, redact } from "../src/secrets.mjs";
 import { parseInvite, isProofMessage } from "../src/join.mjs";
 import { createWallet, loadWallet, walletAddress } from "../src/wallet.mjs";
@@ -78,6 +78,18 @@ test("autopilot counts the agent's savings: the MCP server's repay takes what th
   const p = planTick({ ...two, savedBalance: U(5) });
   assert.deepEqual(p.actions.map((a) => a.loanId), [1]);
   assert.match(p.warnings[0], /loan #2 is due .* needs \$5.013333, but the wallet and its savings hold \$0.986667/);
+});
+
+test("autopilot: a repayment that fails (savings that could not be drawn, say) warns the owner and the pass goes on", async () => {
+  const told = [], logged = [], calls = [];
+  const priors = { async call(_name, args) { calls.push(args.loan_id); if (args.loan_id === 1) throw new Error("VAULT_ILLIQUID: the vault cannot pay out 4.03 USDG now"); return "repaid"; } };
+  const log = { info: () => {}, warn: (m) => logged.push(m) };
+  const actions = [{ type: "repay", loanId: 1, due: U(5.013333), dueAt: NOW + 3600 }, { type: "repay", loanId: 2, due: U(5.013333), dueAt: NOW + 7200 }];
+  const done = await runActions(actions, { priors, log, notify: async (m) => told.push(m) });
+  assert.deepEqual(calls, [1, 2], "the second repayment is still tried");
+  assert.deepEqual(done.map((d) => d.loanId), [2]);
+  assert.equal(told.length, 1);
+  assert.match(told[0], /loan #1 .*could not be repaid: VAULT_ILLIQUID.*send USDG to the agent's wallet now/);
 });
 
 test("autopilot borrows only when configured, with no loan open and room on the line", () => {

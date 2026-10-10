@@ -50,26 +50,47 @@ export async function tick({ provider, priors, cfg, agentId, address, log, notif
   // what a plain withdrawal pays now; a read that fails counts nothing saved, which only makes the plan warn sooner
   const saved = await savingsContracts({ runner: provider }).then((sc) => savingsOf(sc, address)).then((s) => s.withdrawable, () => 0n);
   const { actions, warnings } = planTick({ status, nowS: now, usdgBalance: balance, savedBalance: saved, cfg });
-  const done = [];
   for (const w of warnings) { log.warn(`autopilot: ${w}`); if (/due/.test(w)) await notify(`⚠️ agent001: ${w}`); }
+  const done = await runActions(actions, { priors, log, notify, beforeBorrow: async (a) => {
+    const open = status.openLoans.reduce((s, l) => s + Number(ethers.formatUnits(l.principal, 6)), 0);
+    checkBorrow(cfg.caps, a.amountUsd, open);
+    const q = await quoteBorrow(c, agentId, toUnits(a.amountUsd), BigInt(Math.round(a.days * 86400)));
+    if (balance < q.fee) { log.warn(`autopilot: not borrowing: the fee is ${usd(q.fee)} and the wallet holds ${usd(balance)} (the repayment must not depend on income)`); return null; }
+    log.info(`autopilot: borrowing $${a.amountUsd} for ${a.days} days (fee ${usd(q.fee)})`);
+    return q.fee;
+  } });
+  return { at: now, open: status.openLoans.length, done, warnings };
+}
+
+/**
+ * Act on a plan through the MCP tools, in order. A repayment that fails (the server refused it, or the savings the plan
+ * counted on could not be drawn now) is told to the owner like planTick's warning, and the pass goes on to the next
+ * action. `beforeBorrow(a)` returns the quoted fee to go ahead, or null to skip the borrow.
+ */
+export async function runActions(actions, { priors, log, notify = async () => {}, beforeBorrow = async () => null }) {
+  const done = [];
   for (const a of actions) {
     if (a.type === "repay") {
-      log.info(`autopilot: repaying loan #${a.loanId} (${usd(a.due)}, due ${new Date(a.dueAt * 1000).toISOString()})`);
-      const text = await priors.call("repay", { loan_id: a.loanId });
-      log.info(`autopilot: ${text}`);
-      done.push({ ...a, text });
+      const due = new Date(a.dueAt * 1000).toISOString();
+      log.info(`autopilot: repaying loan #${a.loanId} (${usd(a.due)}, due ${due})`);
+      try {
+        const text = await priors.call("repay", { loan_id: a.loanId });
+        log.info(`autopilot: ${text}`);
+        done.push({ ...a, text });
+      } catch (e) {
+        const w = `loan #${a.loanId} is due ${due} and could not be repaid: ${e.message}: send USDG to the agent's wallet now, or it will be late`;
+        log.warn(`autopilot: ${w}`);
+        await notify(`⚠️ agent001: ${w}`);
+      }
     } else if (a.type === "borrow") {
-      const open = status.openLoans.reduce((s, l) => s + Number(ethers.formatUnits(l.principal, 6)), 0);
-      checkBorrow(cfg.caps, a.amountUsd, open);
-      const q = await quoteBorrow(c, agentId, toUnits(a.amountUsd), BigInt(Math.round(a.days * 86400)));
-      if (balance < q.fee) { log.warn(`autopilot: not borrowing: the fee is ${usd(q.fee)} and the wallet holds ${usd(balance)} (the repayment must not depend on income)`); continue; }
-      log.info(`autopilot: borrowing $${a.amountUsd} for ${a.days} days (fee ${usd(q.fee)})`);
+      const fee = await beforeBorrow(a);
+      if (fee === null) continue;
       const text = await priors.call("borrow", { amount_usd: a.amountUsd, days: a.days });
       log.info(`autopilot: ${text}`);
-      done.push({ ...a, fee: q.fee, text });
+      done.push({ ...a, fee, text });
     }
   }
-  return { at: now, open: status.openLoans.length, done, warnings };
+  return done;
 }
 
 /** Run a pass every autopilot.everyMinutes until `signal` aborts. A failed pass is logged and the loop goes on. */
