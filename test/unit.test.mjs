@@ -72,6 +72,14 @@ test("autopilot repays as many as the wallet covers, earliest due first, and war
   assert.match(p.warnings[0], /loan #2 is due .* needs \$5.013333, but the wallet holds \$0.986667/);
 });
 
+test("autopilot counts the agent's savings: the MCP server's repay takes what the wallet lacks out of them (audit M10)", () => {
+  const two = { status: status({ openLoans: [loan(1, NOW + 60), loan(2, NOW + 120)] }), nowS: NOW, usdgBalance: U(1), cfg: cfg() };
+  assert.deepEqual(planTick({ ...two, savedBalance: U(10) }).actions.map((a) => a.loanId), [1, 2], "$1 in the wallet and $10 saved cover both");
+  const p = planTick({ ...two, savedBalance: U(5) });
+  assert.deepEqual(p.actions.map((a) => a.loanId), [1]);
+  assert.match(p.warnings[0], /loan #2 is due .* needs \$5.013333, but the wallet and its savings hold \$0.986667/);
+});
+
 test("autopilot borrows only when configured, with no loan open and room on the line", () => {
   assert.deepEqual(planTick({ status: status(), nowS: NOW, usdgBalance: U(1), cfg: cfg() }).actions, []);
   assert.deepEqual(planTick({ status: status(), nowS: NOW, usdgBalance: U(1), cfg: cfg({ borrow: true }) }).actions, [{ type: "borrow", amountUsd: 5, days: 8 }]);

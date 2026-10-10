@@ -1,6 +1,6 @@
 // Telegram: money moves only for the owner's chat. Every other chat's /borrow, /repay and /pay is refused before the
-// Priors MCP server is asked anything, and in a free-text conversation a non-owner's model is neither offered the money
-// tools nor allowed to call them.
+// Priors MCP server is asked anything, and in a free-text conversation a non-owner's model is offered only the read-only
+// tools and refused any other.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
@@ -21,7 +21,8 @@ function harness({ ownerChatId = OWNER, model = null } = {}) {
     return new Response(JSON.stringify({ ok: true, result: method === "getUpdates" ? [] : { message_id: sent.length } }));
   };
   const priors = {
-    async tools() { return ["pay_url", "borrow", "repay", "credit_status", "score_of"].map((name) => ({ name, description: name, inputSchema: { type: "object" } })); },
+    // marked as @priors/mcp marks them: the reads read-only, the rest not
+    async tools() { return ["pay_url", "borrow", "repay", "credit_status", "score_of"].map((name) => ({ name, description: name, inputSchema: { type: "object" }, annotations: { readOnlyHint: ["credit_status", "score_of"].includes(name) } })); },
     async call(name, args) { calls.push({ name, args }); return `${name} done`; },
   };
   const ctx = { cfg: structuredClone(DEFAULTS), home: mkdtempSync(join(tmpdir(), "agent001-tg-")), agentId: 42, address: "0x0000000000000000000000000000000000000001", sandbox: true };
@@ -76,7 +77,7 @@ test("in conversation, a non-owner's model is not offered the money tools, and a
   assert.equal(offered[0].includes("borrow"), false);
   assert.equal(offered[0].includes("pay_url"), false);
   assert.equal(offered[0].includes("credit_status"), true);
-  assert.match(h.sent[0].text, /result: refused: borrow moves money, and only this agent's owner can ask for that/);
+  assert.match(h.sent[0].text, /result: refused: borrow is not a read-only tool, and only this agent's owner can ask for that/);
 });
 
 test("the autopilot's alerts to the owner (agent001 run) are redacted like every other message, and go to the owner only", async () => {

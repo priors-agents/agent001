@@ -195,8 +195,12 @@ agent001 run                       # the autopilot and the bot together
 ```
 
 Anyone can ask the bot `/status` or talk to it about records. Only the owner's chat can `/borrow`, `/repay` or `/pay`,
-or get the model to call a money tool: for every other chat those are refused before anything reaches the MCP server,
-and the model is not even offered the money tools.
+or get the model to call a tool that is not read-only: for every other chat the model is offered only the MCP tools
+the server marks read-only (`readOnlyHint`), and any other tool, one a later @priors/mcp adds included, is refused
+before anything reaches the MCP server.
+
+The autopilot counts the agent's savings when it plans a repayment: the MCP server's `repay` takes what the wallet
+lacks out of savings first, so it warns only when the wallet and its savings together fall short.
 
 ## Configuration
 

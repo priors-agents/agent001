@@ -9,22 +9,27 @@
 // autopilot.borrowDays, but only if the wallet already holds the fee, so the repayment never depends on income.
 // Repay and borrow go through the Priors MCP server's tools (src/priors.mjs); reads come from the chain.
 import { creditContracts, creditStatus, quoteBorrow } from "@priors/x402/credit";
+import { savingsContracts, savingsOf } from "@priors/x402/savings";
 import { ethers } from "ethers";
 import { ADDR, usd, toUnits } from "./chain.mjs";
 import { checkBorrow } from "./caps.mjs";
 
 const contractsFor = (provider) => creditContracts({ runner: provider, addresses: { pool: ADDR.pool, lens: ADDR.lens, usdg: ADDR.usdg, registry: ADDR.registry } });
 
-/** What to do now, from the agent's status (creditStatus), the wallet's USDG and the configuration. Pure. */
-export function planTick({ status, nowS, usdgBalance, cfg }) {
+/**
+ * What to do now, from the agent's status (creditStatus), the wallet's USDG, what it has saved (the MCP server's repay
+ * takes what the wallet lacks out of savings first) and the configuration. Pure.
+ */
+export function planTick({ status, nowS, usdgBalance, savedBalance = 0n, cfg }) {
   const actions = [], warnings = [];
   if (status.defaulted) return { actions, warnings: ["this agent has defaulted: it can never borrow again"] };
   const margin = cfg.autopilot.repayHoursBeforeDue * 3600;
-  let funds = BigInt(usdgBalance);
+  let funds = BigInt(usdgBalance) + BigInt(savedBalance);
+  const where = BigInt(savedBalance) > 0n ? "the wallet and its savings hold" : "the wallet holds";
   for (const l of status.openLoans) { // earliest due first
     if (nowS < l.dueAt - margin) continue;
     if (funds >= l.due) { actions.push({ type: "repay", loanId: Number(l.loanId), due: l.due, dueAt: l.dueAt }); funds -= l.due; }
-    else warnings.push(`loan #${l.loanId} is due ${new Date(l.dueAt * 1000).toISOString()} and needs ${usd(l.due)}, but the wallet holds ${usd(funds)}: send USDG to the agent's wallet now, or it will be late`);
+    else warnings.push(`loan #${l.loanId} is due ${new Date(l.dueAt * 1000).toISOString()} and needs ${usd(l.due)}, but ${where} ${usd(funds)}: send USDG to the agent's wallet now, or it will be late`);
   }
   if (cfg.autopilot.borrow && status.openLoans.length === 0) {
     const amount = toUnits(cfg.autopilot.borrowUsd);
@@ -42,7 +47,9 @@ export async function tick({ provider, priors, cfg, agentId, address, log, notif
   const now = nowS ?? (await provider.getBlock("latest")).timestamp;
   const status = await creditStatus(c, agentId);
   const balance = await c.usdg.balanceOf(address);
-  const { actions, warnings } = planTick({ status, nowS: now, usdgBalance: balance, cfg });
+  // what a plain withdrawal pays now; a read that fails counts nothing saved, which only makes the plan warn sooner
+  const saved = await savingsContracts({ runner: provider }).then((sc) => savingsOf(sc, address)).then((s) => s.withdrawable, () => 0n);
+  const { actions, warnings } = planTick({ status, nowS: now, usdgBalance: balance, savedBalance: saved, cfg });
   const done = [];
   for (const w of warnings) { log.warn(`autopilot: ${w}`); if (/due/.test(w)) await notify(`⚠️ agent001: ${w}`); }
   for (const a of actions) {

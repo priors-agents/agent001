@@ -10,8 +10,12 @@ import { contractsFor } from "./autopilot.mjs";
 import { redact, safeMessage } from "./secrets.mjs";
 import { usd } from "./chain.mjs";
 
-/** The Priors tools that move money: offered to the owner only, and refused for anyone else even if asked. */
-export const MONEY_TOOLS = new Set(["pay_url", "borrow", "repay"]);
+/**
+ * What anyone but the owner may use: the MCP tools the server marks read-only (`annotations.readOnlyHint`), and no
+ * other. A list of the tools that move money went stale when @priors/mcp 0.8.0 added save, unsave, pt_buy and the
+ * rest (audit M10); a tool the server does not mark read-only, a new one included, is the owner's.
+ */
+export const readOnly = (t) => t?.annotations?.readOnlyHint === true;
 
 const OWN_TOOLS = [{
   name: "my_status",
@@ -31,21 +35,21 @@ export function systemPrompt({ agentId, address, sandbox, owner }) {
   ].join("\n");
 }
 
-/** The tools the model is offered: MCP tools (money ones only for the owner) + agent001's own. */
+/** The tools the model is offered: MCP tools (for anyone but the owner, the read-only ones only) + agent001's own. */
 export async function toolsFor(priors, { owner }) {
-  const mcp = (await priors.tools()).filter((t) => owner || !MONEY_TOOLS.has(t.name));
+  const mcp = (await priors.tools()).filter((t) => owner || readOnly(t));
   return [...mcp.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })), ...OWN_TOOLS];
 }
 
 /**
- * Run one tool call the model made. Money tools: refused unless `owner`, then agent001's caps, then the MCP server
- * (which holds the same caps). Returns { text, isError }.
+ * Run one tool call the model made. Anything but a read-only MCP tool: refused unless `owner`; then agent001's caps for
+ * money tools, then the MCP server (which holds the same caps). Returns { text, isError }.
  */
 export async function runTool(call, { priors, owner, ctx }) {
   const { name, input = {} } = call;
   try {
     if (name === "my_status") return { text: await statusText(ctx), isError: false };
-    if (MONEY_TOOLS.has(name) && !owner) return { text: `refused: ${name} moves money, and only this agent's owner can ask for that`, isError: true };
+    if (!owner && !readOnly((await priors.tools()).find((t) => t.name === name))) return { text: `refused: ${name} is not a read-only tool, and only this agent's owner can ask for that`, isError: true };
     if (name === "borrow" && !input.dry_run) {
       const s = await creditStatus(contractsFor(ctx.provider), ctx.agentId);
       checkBorrow(ctx.cfg.caps, Number(input.amount_usd), s.openLoans.reduce((t, l) => t + Number(ethers.formatUnits(l.principal, 6)), 0));

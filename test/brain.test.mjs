@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { converse, anthropicModel, openaiModel, basicModel, modelFromEnv } from "../src/brain.mjs";
+import { converse, anthropicModel, openaiModel, basicModel, modelFromEnv, toolsFor, runTool } from "../src/brain.mjs";
 import { DEFAULTS } from "../src/config.mjs";
 import { addSecret } from "../src/secrets.mjs";
 
@@ -25,6 +25,22 @@ test("a tool call goes to the Priors MCP server and its answer goes back to the 
   const reply = await converse({ model, history: [], userText: "what is my line?", priors, owner: true, ctx: ctxOf() });
   assert.deepEqual(priors.calls, [{ name: "credit_status", args: {} }]);
   assert.equal(reply, "You have Line $5.00, drawn $0.00");
+});
+
+test("a non-owner is offered and allowed only the MCP tools marked read-only, whatever tools the server adds (audit M10)", async () => {
+  const calls = [];
+  const tool = (name, readOnlyHint) => ({ name, description: name, inputSchema: { type: "object" }, ...(readOnlyHint === undefined ? {} : { annotations: { readOnlyHint } }) });
+  // @priors/mcp 0.8.0 added save, unsave, pt_buy... that a name list made in 0.7 did not know about
+  const priors = { async tools() { return [tool("credit_status", true), tool("score_of", true), tool("save", false), tool("pt_buy", false), tool("borrow", false), tool("new_unmarked")]; }, async call(name, args) { calls.push(name); return "done"; } };
+  const offered = (await toolsFor(priors, { owner: false })).map((t) => t.name);
+  assert.deepEqual(offered.filter((n) => n !== "my_status").sort(), ["credit_status", "score_of"]);
+  for (const name of ["save", "pt_buy", "borrow", "new_unmarked"]) {
+    const r = await runTool({ name, input: {} }, { priors, owner: false, ctx: ctxOf() });
+    assert.ok(r.isError && /only this agent's owner/.test(r.text), `${name}: ${r.text}`);
+  }
+  assert.deepEqual(calls, [], "nothing reached the MCP server for a non-owner");
+  assert.equal((await runTool({ name: "score_of", input: { agent_id: 1 } }, { priors, owner: false, ctx: ctxOf() })).text, "done");
+  assert.ok((await toolsFor(priors, { owner: true })).some((t) => t.name === "save"), "the owner keeps every tool");
 });
 
 test("an x402 payment above agent001's cap is refused before the MCP server is asked", async () => {
