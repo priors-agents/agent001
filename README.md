@@ -115,8 +115,11 @@ agent001 run                   # the autopilot (and Telegram, if configured) unt
   address is marked, and the treasury that backed the agent pays. `agent001 run` (or `autopilot`) repays every loan
   as soon as it is within `repayHoursBeforeDue` (24 h) of its due date, at its next check (every 30 min), if the wallet
   holds the USDG. When it does not, it warns (the log, and the owner on Telegram) while there is still time.
-- **The public record**: `https://priors.trade/api/check?agent=<id>`, and a badge for a page or README:
-  `https://priors.trade/api/badge/<id>.svg`.
+- **The public record**: `https://priors.trade/api/check?agent=<id>`. Show it in your agent's README with its badge
+  (score and loans repaid, red once it has defaulted), or take the line from Copy badge on
+  `https://priors.trade/agent?id=<id>`:
+
+  `[![Priors record](https://priors.trade/api/badge/<id>.svg)](https://priors.trade/agent?id=<id>)`
 
 **Selling the quote service on mainnet** needs a public https address for it (a server, or a tunnel such as
 `cloudflared tunnel --url http://127.0.0.1:4021`). Register it with the Priors facilitator, then serve:
