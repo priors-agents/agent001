@@ -11,6 +11,7 @@ import { planTick, runActions } from "../src/autopilot.mjs";
 import { addSecret, redact } from "../src/secrets.mjs";
 import { parseInvite, isProofMessage } from "../src/join.mjs";
 import { createWallet, loadWallet, walletAddress } from "../src/wallet.mjs";
+import { serverEnv } from "../src/priors.mjs";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "agent001-"));
 const caps = { ...DEFAULTS.caps, maxBorrowUsd: 5, maxOpenBorrowUsd: 8, maxPriceUsd: 0.1, maxSpendPerDayUsd: 0.25 };
@@ -127,6 +128,16 @@ test("a wallet key from AGENT001_WALLET_KEY (a hosting platform's secret) replac
   assert.throws(() => loadWallet(home, null, { AGENT001_WALLET_KEY: bad }), (e) => /not a valid private key/.test(e.message) && !e.message.includes("zzzz"));
   // without it, the file as before
   assert.throws(() => loadWallet(home, null, {}), /no wallet yet/);
+});
+
+test("the Priors MCP server's environment: the agent's id, and with no agent yet, no Autopay reserve to look one up for", () => {
+  const base = { key: null, rpc: "http://127.0.0.1:8545", caps: DEFAULTS.caps, home: tmp() };
+  const none = serverEnv({ ...base, agentId: null });
+  assert.equal(none.PRIORS_AGENT_ID, undefined);
+  assert.equal(none.PRIORS_AUTOPAY_RESERVE, "off", "a wallet before join: pay_url does not scan the registry first");
+  const agent = serverEnv({ ...base, agentId: 7 });
+  assert.equal(agent.PRIORS_AGENT_ID, "7");
+  assert.equal(agent.PRIORS_AUTOPAY_RESERVE, undefined, "an agent keeps the server's default: what its Autopay loans pull is kept back");
 });
 
 test("invites: the code is checked before anything is sent; only the exact ownership proof is ever signed", () => {

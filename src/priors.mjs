@@ -31,6 +31,10 @@ export function serverEnv({ key, rpc, agentId, caps, home, sandbox = false }) {
   };
   if (key) env.PRIORS_KEY = key;
   if (agentId !== null && agentId !== undefined) env.PRIORS_AGENT_ID = String(agentId);
+  // No agent yet (a wallet before `join`, the sandbox's buyer): no Autopay plan to keep money back for, so no reserve.
+  // With it on, the server would first look such a wallet's agent up in every registry log since the v2 deploy: up to
+  // 10 s on 0.10.1 (0.10.0 waited with no bound, and pay_url ran out of its 45 s). With an agent id, the reserve stays on.
+  else env.PRIORS_AUTOPAY_RESERVE = "off";
   if (sandbox) env.PRIORS_ALLOW_LOCAL = "1"; // the sandbox's services run on localhost
   return env;
 }
