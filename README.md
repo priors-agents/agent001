@@ -185,7 +185,8 @@ file anywhere you have a shell.
 `agent001 chat` uses Claude when `ANTHROPIC_API_KEY` is set, or any OpenAI-compatible endpoint (OpenAI, OpenRouter, a
 local server) with `"brain": { "provider": "openai", "model": "<model>", "baseUrl": "<url>" }` in
 `.agent001/config.json` and `OPENAI_API_KEY`. The model gets the Priors tools: `credit_status`, `score_of`, `pay_url`,
-`borrow`, `repay`, `find_services`, `wallet_balance`, the stock tools, and agent001's own `my_status`. With no model
+`borrow`, `repay`, `find_services`, `wallet_balance`, Autopay, savings, the stock and PT-USDG tools, and agent001's own
+`my_status`. With no model
 configured, a basic brain answers questions about the agent's own record and nothing else.
 
 On **Telegram**: create a bot with [@BotFather](https://t.me/BotFather), then:

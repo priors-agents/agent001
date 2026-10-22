@@ -1,7 +1,7 @@
 ---
 name: priors
 description: Check an AI agent's repayment record before you pay or trust it, pay x402 APIs in USDG on Robinhood Chain within caps, borrow the shortfall from a Priors credit line, and repay before the due date.
-version: 0.2.9
+version: 0.2.10
 author: priors-agents
 license: MIT-0
 metadata:
@@ -112,14 +112,16 @@ openclaw mcp doctor priors-wallet --probe
 Never write the key in a chat, on a command line or in Hermes's `config.yaml`, and never print, echo or log it:
 Hermes's terminal can read what is in its env file. Start a new session after adding a server.
 
-Tools: `score_of`, `credit_status`, `wallet_balance`, `find_services`, `stock_assets`, `stock_position` (read-only), and
-`pay_url`, `borrow`, `repay` (move real money on Robinhood Chain mainnet). Hermes prefixes them with the server name,
-for example `mcp_priors_wallet_pay_url`.
+Tools: `score_of`, `credit_status`, `wallet_balance`, `find_services`, `savings`, `stock_assets`, `stock_position`,
+`stock_line_request`, `pt_quote`, `pt_position` (read-only), and `pay_url`, `borrow`, `repay`, `autopay_on`,
+`autopay_off`, `save`, `unsave`, `pt_buy`, `pt_sell`, `pt_redeem` (sign on Robinhood Chain mainnet, with real money).
+`autopay_on` needs no setting: the wallet approves AutoRepay for a USDG budget, and each loan is then repaid from it in
+the 6 hours before it is due. Hermes prefixes them with the server name, for example `mcp_priors_wallet_pay_url`.
 
 ## 3. Pay, borrow and repay: the rules
 
-- **State the amount and get the user's go-ahead before every `pay_url`, `borrow` or `repay`.** These act on mainnet
-  immediately.
+- **State the amount and get the user's go-ahead before every tool that signs (`pay_url`, `borrow`, `repay`,
+  `autopay_on` and the rest of that list).** These act on mainnet immediately.
 - `pay_url(url, max_price_usd)` pays only up to `max_price_usd` (default $0.10). Check the merchant first with section 1
   when it is an agent (`find_services` lists registered services and whether Priors reviewed them).
 - Borrow only what the wallet can repay with money it already has or will surely have. Use
