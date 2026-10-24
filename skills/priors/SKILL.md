@@ -1,7 +1,7 @@
 ---
 name: priors
 description: Check an AI agent's repayment record before you pay or trust it, pay x402 APIs in USDG on Robinhood Chain within caps, borrow the shortfall from a Priors credit line, and repay before the due date.
-version: 0.2.11
+version: 0.2.12
 author: priors-agents
 license: MIT-0
 metadata:
@@ -89,7 +89,7 @@ Use a dedicated wallet that holds only what the agent may spend. Install the ser
 download each time it starts):
 
 ```bash
-npm install -g @priors/mcp@0.10.2
+npm install -g @priors/mcp@0.11.0
 ```
 
 In Hermes, the user adds the line `PRIORS_KEY=0x…` with an editor to Hermes's env file (`hermes config env-path` prints
@@ -115,7 +115,9 @@ Hermes's terminal can read what is in its env file. Start a new session after ad
 Tools: `score_of`, `credit_status`, `wallet_balance`, `find_services`, `savings`, `stock_assets`, `stock_position`,
 `stock_line_request`, `pt_quote`, `pt_position` (read-only), and `pay_url`, `borrow`, `repay`, `autopay_on`,
 `autopay_off`, `save`, `unsave`, `pt_buy`, `pt_sell`, `pt_redeem` (sign on Robinhood Chain mainnet, with real money).
-`autopay_on` needs no setting: the wallet approves AutoRepay for a USDG budget, and each loan is then repaid from it in
+With `PRIORS_JOIN=on` in the server's environment, `join` (from 0.11.0) registers an ERC-8004 identity for the wallet
+when it owns none, with no clone of a repository (one transaction, its gas in the wallet's ETH), and answers its id and
+its routes to a first line; a wallet that owns one gets its id and nothing is sent. `autopay_on` needs no setting: the wallet approves AutoRepay for a USDG budget, and each loan is then repaid from it in
 the 6 hours before it is due. The key must be the agent's owner or its declared ERC-8004 wallet: from 0.10.2, a key
 that is only the pool's delegate neither borrows nor repays (its owner declares it once with the registry's
 `setAgentWallet`). Hermes prefixes them with the server name, for example `mcp_priors_wallet_pay_url`.
