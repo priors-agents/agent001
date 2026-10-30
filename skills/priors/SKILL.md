@@ -1,7 +1,7 @@
 ---
 name: priors
 description: Check an AI agent's repayment record before you pay or trust it, pay x402 APIs in USDG on Robinhood Chain within caps, borrow the shortfall from a Priors credit line, and repay before the due date.
-version: 0.2.14
+version: 0.2.15
 author: priors-agents
 license: MIT-0
 metadata:
