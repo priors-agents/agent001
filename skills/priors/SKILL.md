@@ -1,36 +1,38 @@
 ---
 name: priors
 description: Check an AI agent's repayment record before you pay or trust it, pay x402 APIs in USDG on Robinhood Chain within caps, borrow the shortfall from a Priors credit line, and repay before the due date.
-version: 0.2.15
+version: 0.2.16
 author: priors-agents
 license: MIT-0
 metadata:
-  hermes:
-    tags: [payments, x402, credit, reputation, erc-8004, robinhood-chain, usdg, mcp]
-  openclaw:
-    emoji: "🧾"
-    homepage: https://github.com/priors-agents/agent001/tree/main/skills/priors
-    requires:
-      anyBins:
-        - curl
-        - node
-    primaryEnv: PRIORS_KEY
-    envVars:
-      - name: PRIORS_KEY
-        required: false
-        description: Private key of a dedicated agent wallet on Robinhood Chain, only for paying, borrowing and repaying (the local @priors/mcp server). Not needed to check records. Never paste it in chat.
-      - name: PRIORS_AGENT_ID
-        required: false
-        description: The wallet's Priors (ERC-8004) agent id, when it cannot be looked up automatically.
-      - name: PRIORS_MAX_PRICE_USD
-        required: false
-        description: Most one x402 call may cost (default 1.00).
-      - name: PRIORS_MAX_SPEND_USD
-        required: false
-        description: Most x402 payments may total while the server runs (default 5).
-      - name: PRIORS_MAX_BORROW_USD
-        required: false
-        description: Most one loan may be (default 25).
+  homepage: https://github.com/priors-agents/agent001/tree/main/skills/priors
+  emoji: "🧾"
+  tags: payments, x402, credit, reputation, erc-8004, robinhood-chain, usdg, mcp
+tags: [payments, x402, credit, reputation, erc-8004, robinhood-chain, usdg, mcp]
+clawdis:
+  emoji: "🧾"
+  homepage: https://github.com/priors-agents/agent001/tree/main/skills/priors
+  requires:
+    anyBins:
+      - curl
+      - node
+  primaryEnv: PRIORS_KEY
+  envVars:
+    - name: PRIORS_KEY
+      required: false
+      description: Private key of a dedicated agent wallet on Robinhood Chain, only for paying, borrowing and repaying (the local @priors/mcp server). Not needed to check records. Never paste it in chat.
+    - name: PRIORS_AGENT_ID
+      required: false
+      description: The wallet's Priors (ERC-8004) agent id, when it cannot be looked up automatically.
+    - name: PRIORS_MAX_PRICE_USD
+      required: false
+      description: Most one x402 call may cost (default 1.00).
+    - name: PRIORS_MAX_SPEND_USD
+      required: false
+      description: Most x402 payments may total while the server runs (default 5).
+    - name: PRIORS_MAX_BORROW_USD
+      required: false
+      description: Most one loan may be (default 25).
 ---
 
 # Priors: check, pay, borrow, repay
